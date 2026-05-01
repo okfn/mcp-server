@@ -54,7 +54,9 @@ import inspect
 
 import pandas as pd
 
+from mcp_server import DataToolOutput
 from mcp_server.engines.filters import build_filter_params, apply_filters, build_filter_doc
+from mcp_server.responses import text_result, force_result
 
 
 def load_top_row_dataset(mcp, config, yaml_path):
@@ -84,11 +86,11 @@ def load_top_row_dataset(mcp, config, yaml_path):
         try:
             df, filter_label = apply_filters(df, tool_cfg, kwargs)
         except ValueError as e:
-            return f"Error en los parámetros: {e}"
+            return force_result(f"Error en los parámetros: {e}", source_url)
 
         if df.empty:
             label = f" {filter_label}" if filter_label else ""
-            return f"No se encontraron resultados{label}."
+            return force_result(f"No se encontraron resultados{label}.", source_url)
 
         col = df[column].dropna()
         idx = col.idxmax() if order == "max" else col.idxmin()
@@ -97,11 +99,15 @@ def load_top_row_dataset(mcp, config, yaml_path):
         result = fmt.format(result=row[column])
 
         details_lines = []
+        header = []
+        values = []
         for field in show:
             label = field.get("label", field["column"])
             field_fmt = field.get("format", "{result}")
             value = field_fmt.format(result=row[field["column"]])
             details_lines.append(f"  - {label}: {value}")
+            header.append(label)
+            values.append(value)
         details = "\n".join(details_lines)
 
         context = {
@@ -113,10 +119,15 @@ def load_top_row_dataset(mcp, config, yaml_path):
         }
 
         if response_template:
-            return response_template.format(**context)
-        return f"Top result {filter_label}: {result}\n{details}"
+            text = response_template.format(**context)
+        else:
+            text = f"Top result {filter_label}: {result}\n{details}"
 
-    tool_fn.__signature__ = inspect.Signature(filter_params)
+        table = [header, values] if header else None
+        return text_result(text, source_url, table=table)
+
+    tool_fn.__signature__ = inspect.Signature(filter_params, return_annotation=DataToolOutput)
+    tool_fn.__annotations__["return"] = DataToolOutput
     tool_fn.__name__ = tool_name
     tool_fn.__doc__ = build_filter_doc(tool_cfg, tool_desc)
     mcp.tool()(tool_fn)

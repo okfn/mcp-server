@@ -53,7 +53,9 @@ YAML config example:
 
 import inspect
 import pandas as pd
+from mcp_server import DataToolOutput
 from mcp_server.engines.filters import build_filter_params, apply_filters, build_filter_doc
+from mcp_server.responses import text_result, force_result
 
 
 def load_row_list_dataset(mcp, config, yaml_path):
@@ -82,11 +84,11 @@ def load_row_list_dataset(mcp, config, yaml_path):
         try:
             df, filter_label = apply_filters(df, tool_cfg, kwargs)
         except ValueError as e:
-            return f"Error en los parámetros: {e}"
+            return force_result(f"Error en los parámetros: {e}", source_url)
 
         if df.empty:
             label = f" {filter_label}" if filter_label else ""
-            return f"No se encontraron resultados{label}."
+            return force_result(f"No se encontraron resultados{label}.", source_url)
 
         rows_lines = []
         total = len(df)
@@ -96,14 +98,20 @@ def load_row_list_dataset(mcp, config, yaml_path):
                 ascending=sort_cfg.get("order", "asc") == "asc",
             )
         display_df = df if not limit else df.head(limit)
+
+        header = [f.get("label", f["column"]) for f in columns]
+        table_data = []
         for _, row in display_df.iterrows():
             parts = []
+            row_cells = []
             for field in columns:
                 label = field.get("label", field["column"])
                 field_fmt = field.get("format", "{result}")
                 value = field_fmt.format(result=row[field["column"]])
                 parts.append(f"{label}: {value}")
+                row_cells.append(value)
             rows_lines.append("  - " + " | ".join(parts))
+            table_data.append(row_cells)
 
         if limit and total > limit:
             rows_lines.append(f"  ... y {total - limit} más.")
@@ -118,10 +126,15 @@ def load_row_list_dataset(mcp, config, yaml_path):
         }
 
         if response_template:
-            return response_template.format(**context)
-        return f"{total} resultados {filter_label}:\n{list_str}"
+            text = response_template.format(**context)
+        else:
+            text = f"{total} resultados {filter_label}:\n{list_str}"
 
-    tool_fn.__signature__ = inspect.Signature(filter_params)
+        table = [header] + table_data if header else None
+        return text_result(text, source_url, table=table)
+
+    tool_fn.__signature__ = inspect.Signature(filter_params, return_annotation=DataToolOutput)
+    tool_fn.__annotations__["return"] = DataToolOutput
     tool_fn.__name__ = tool_name
     tool_fn.__doc__ = build_filter_doc(tool_cfg, tool_desc)
     mcp.tool()(tool_fn)

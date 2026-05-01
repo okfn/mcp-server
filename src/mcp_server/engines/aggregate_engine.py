@@ -43,7 +43,9 @@ import inspect
 
 import pandas as pd
 
+from mcp_server import DataToolOutput
 from mcp_server.engines.filters import build_filter_params, apply_filters, build_filter_doc
+from mcp_server.responses import text_result, force_result
 
 
 AGGREGATIONS = {
@@ -82,11 +84,11 @@ def load_aggregate_dataset(mcp, config, yaml_path):
         try:
             df, filter_label = apply_filters(df, tool_cfg, kwargs)
         except ValueError as e:
-            return f"Error en los parámetros: {e}"
+            return force_result(f"Error en los parámetros: {e}", source_url)
 
         if df.empty:
             label = f" {filter_label}" if filter_label else ""
-            return f"No se encontraron resultados{label}."
+            return force_result(f"No se encontraron resultados{label}.", source_url)
 
         value = agg_fn(df[column].dropna())
         result = fmt.format(result=value)
@@ -98,10 +100,13 @@ def load_aggregate_dataset(mcp, config, yaml_path):
         }
 
         if response_template:
-            return response_template.format(**context)
-        return f"Result {filter_label}: {result}"
+            text = response_template.format(**context)
+        else:
+            text = f"Result {filter_label}: {result}"
+        return text_result(text, source_url)
 
-    tool_fn.__signature__ = inspect.Signature(filter_params)
+    tool_fn.__signature__ = inspect.Signature(filter_params, return_annotation=DataToolOutput)
+    tool_fn.__annotations__["return"] = DataToolOutput
     tool_fn.__name__ = tool_name
     tool_fn.__doc__ = build_filter_doc(tool_cfg, tool_desc)
     mcp.tool()(tool_fn)
