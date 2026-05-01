@@ -9,13 +9,15 @@ YAML-defined tool produces a correct return value.
 from mcp.types import CallToolResult, TextContent
 
 
-def text_result(text, source_url="", table=None, charts=None):
+def text_result(text, source_url="", table=None, charts=None, force=None):
     """Successful response: text content plus structured sources/table/charts."""
     structured = {"sources": [source_url] if source_url else []}
     if table is not None:
         structured["table"] = table
     if charts:
         structured["charts"] = charts
+    if force:
+        structured["force"] = force
     return CallToolResult(
         content=[TextContent(type="text", text=text)],
         structuredContent=structured,
