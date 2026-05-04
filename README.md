@@ -129,6 +129,34 @@ npx @modelcontextprotocol/inspector
 
 7. Navigate to the MCP Inspector webpage and connect to `http://127.0.0.1:8063` (no `/mcp`) using `Streamable HTTP` transport type
 
+## Tool return values
+
+Using the `python-sdk` cannonical way of building results (this is, the `CallToolResult` object) can get quite verbose quite fast. For
+that reason, the `mcp_server` provides an optional set of functions to use.
+
+The two following tools and return values are possible:
+
+```python
+@registry.tool()
+def hello_world() -> DataToolOutput:
+    """Return a hello world value. """
+    source = "https://example.org/link/to/data"
+    return CallToolResult(
+        content=[TextContent(type="text", text="Hello world!!")],
+        structuredContent={"sources": [source]},
+    )
+```
+
+```python
+from mcp_server.results import text_result
+
+@registry.tool()
+def hello_world() -> DataToolOutput:
+    """Return a hello world value. """
+    source = "https://example.org/link/to/data"
+    return text_result("Hello world!!", source=source)
+```
+
 ## DataToolOutput
 
 This MCP Server uses a `DataToolOutput` annotation and a `ValidationModel` to enforce a standardized contract between plugins and the server. The schema is still in development so changes are expected.
