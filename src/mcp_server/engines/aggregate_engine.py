@@ -45,7 +45,7 @@ import pandas as pd
 
 from mcp_server import DataToolOutput
 from mcp_server.engines.filters import build_filter_params, apply_filters, build_filter_doc
-from mcp_server.responses import text_result, force_result
+from mcp_server.results import text_result, force_result
 
 
 AGGREGATIONS = {
