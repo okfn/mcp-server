@@ -4,6 +4,7 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server import DataToolOutput
+from mcp_server.repo import get_repo_metadata
 
 log = logging.getLogger(__name__)
 
@@ -25,9 +26,10 @@ class ToolRegistry:
     Use ``for_plugin()`` so every tool that plugin registers is automatically namespaced.
     """
 
-    def __init__(self, mcp: FastMCP, namespace: str | None = None):
+    def __init__(self, mcp: FastMCP, namespace: str | None = None, plugin_metadata: dict | None = None):
         self._mcp = mcp
         self._namespace = namespace
+        self._plugin_metadata = plugin_metadata
 
     def for_plugin(self, package_name: str) -> "ToolRegistry":
         """Return a sub-registry that namespaces tools under the plugin package.
@@ -35,8 +37,13 @@ class ToolRegistry:
         The returned registry shares the same FastMCP instance, so all tools
         end up on the same server, but their names are prefixed with the
         namespace derived from ``package_name``.
+        Allow using metadata from the remote repo
         """
-        return ToolRegistry(self._mcp, namespace=package_name)
+        return ToolRegistry(
+            self._mcp,
+            namespace=package_name,
+            plugin_metadata=get_repo_metadata(package_name),
+        )
 
     def tool(self):
         """Decorator that registers a function with FastMCP after validating its
@@ -68,6 +75,14 @@ class ToolRegistry:
             if self._namespace and not fn.__name__.startswith(self._namespace + "_"):
                 fn.__name__ = f"{self._namespace}_{fn.__name__}"
 
+            # Use the internal mcp "meta" to preserve metadata
+            # and eventually use it in chat gateway or other remote clients
+            tool_meta = None
+            if self._namespace:
+                tool_meta = {"plugin": self._namespace}
+                if self._plugin_metadata:
+                    tool_meta["plugin_metadata"] = self._plugin_metadata
+
             log.info(f" - Registered: [{fn.__name__}]")
-            return self._mcp.tool()(fn)
+            return self._mcp.tool(meta=tool_meta)(fn)
         return decorator
