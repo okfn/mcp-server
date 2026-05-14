@@ -5,7 +5,7 @@ __pycache__/
 remote_tools/
 remotes/
 # tool_sources.yaml
-
+CLAUDE.md
 # Ignore all keys except the README.md file
 deploy/keys/*
 !deploy/keys/README.md
