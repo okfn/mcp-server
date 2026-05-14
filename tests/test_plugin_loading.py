@@ -32,6 +32,10 @@ class TestPythonPlugins:
 
             load_python_plugins(mcp_mock)
 
-            mock_plugin_register_tools.assert_called_once_with(mcp_mock)
+            # The plugin must be handed a namespaced sub-registry, not the root
+            # registry, so its tool names get prefixed by package and cannot
+            # collide with other plugins.
+            mcp_mock.for_plugin.assert_called_once_with("mcp_ckan_test")
+            mock_plugin_register_tools.assert_called_once_with(mcp_mock.for_plugin.return_value)
             mock_non_mcp_ckan_register_tools.assert_not_called()
             mock_non_group_ckan_register_tools.assert_not_called()
