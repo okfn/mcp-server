@@ -45,6 +45,24 @@ class ToolRegistry:
             plugin_metadata=get_repo_metadata(package_name),
         )
 
+    def set_plugin_info(self, description: str | None = None, sample_questions: list[str] | None = None) -> None:
+        """Self-describe the plugin so MCP clients can render a richer catalog.
+
+        Plugins call this from ``register_tools()`` before declaring their tools.
+        The values are merged into ``_meta.plugin_metadata`` alongside the URLs
+        already read from ``[project.urls]`` — the server stays agnostic; only
+        the plugin knows what its description and sample questions are.
+
+        Call this BEFORE any ``@registry.tool()`` decorators so every tool's
+        meta payload picks up the new fields.
+        """
+        if self._plugin_metadata is None:
+            self._plugin_metadata = {}
+        if description is not None:
+            self._plugin_metadata["description"] = description
+        if sample_questions is not None:
+            self._plugin_metadata["sample_questions"] = list(sample_questions)
+
     def tool(self):
         """Decorator that registers a function with FastMCP after validating its
         return type annotation.

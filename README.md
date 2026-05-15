@@ -129,6 +129,31 @@ npx @modelcontextprotocol/inspector
 
 7. Navigate to the MCP Inspector webpage and connect to `http://127.0.0.1:8063` (no `/mcp`) using `Streamable HTTP` transport type
 
+## Self-describing your plugin
+
+Clients that browse the tool catalog (the chat gateway, MCP Inspector, etc.) can render a richer landing card when a plugin advertises its own description and sample questions. Use `registry.set_plugin_info()` from `register_tools()` **before** declaring any `@registry.tool()`, so every tool's `_meta.plugin_metadata` picks up the values:
+
+```python
+def register_tools(registry):
+
+    registry.set_plugin_info(
+        description=(
+            "Tools over Example Org's open data. "
+            "Public procurement, budgets, and beneficiary lists."
+        ),
+        sample_questions=[
+            "Which companies sell medicine to the government?",
+            "Top 10 recipients of parliamentary amendments",
+        ],
+    )
+
+    @registry.tool()
+    def my_first_tool() -> DataToolOutput:
+        ...
+```
+
+Both fields are optional. `description` is shown as the plugin card subtitle; `sample_questions` become clickable chips that pre-fill the chat input. Repo URLs (Homepage, Issues, Repository, …) are read separately from your `[project.urls]` table in `pyproject.toml` — no need to repeat them here.
+
 ## Tool return values
 
 Using the `python-sdk` cannonical way of building results (this is, the `CallToolResult` object) can get quite verbose quite fast. For
