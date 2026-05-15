@@ -22,10 +22,21 @@ class ToolRegistry:
     Plugins and engines must use this registry instead of calling ``mcp.tool()``
     directly.  The ``tool()`` method returns the same decorator API so existing
     patterns (``@registry.tool()`` and ``registry.tool()(fn)``) work unchanged.
+    Use ``for_plugin()`` so every tool that plugin registers is automatically namespaced.
     """
 
-    def __init__(self, mcp: FastMCP):
+    def __init__(self, mcp: FastMCP, namespace: str | None = None):
         self._mcp = mcp
+        self._namespace = namespace
+
+    def for_plugin(self, package_name: str) -> "ToolRegistry":
+        """Return a sub-registry that namespaces tools under the plugin package.
+
+        The returned registry shares the same FastMCP instance, so all tools
+        end up on the same server, but their names are prefixed with the
+        namespace derived from ``package_name``.
+        """
+        return ToolRegistry(self._mcp, namespace=package_name)
 
     def tool(self):
         """Decorator that registers a function with FastMCP after validating its
@@ -33,6 +44,10 @@ class ToolRegistry:
 
         If the return annotation is not ``ToolOutput``, logs a warning and returns
         the original function **without** registering it with FastMCP.
+
+        When this registry was obtained via ``for_plugin``, the
+        function's ``__name__`` is prefixed with the plugin namespace before
+        being handed to FastMCP, so we avoind name collisions.
         """
         def decorator(fn):
             sig = inspect.signature(fn)
@@ -49,5 +64,10 @@ class ToolRegistry:
                     got,
                 )
                 return fn
+            # If defined, apply the plugin namespace
+            if self._namespace and not fn.__name__.startswith(self._namespace + "_"):
+                fn.__name__ = f"{self._namespace}_{fn.__name__}"
+
+            log.info(f" - Registered: [{fn.__name__}]")
             return self._mcp.tool()(fn)
         return decorator

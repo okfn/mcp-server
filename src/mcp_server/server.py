@@ -18,12 +18,15 @@ log = logging.getLogger(__name__)
 
 
 def load_python_plugins(registry):
-    """Load Python tools defined in plugins."""
+    """Load Python tools defined in plugins.
+    Each plugin defines a namespaced sub-registry so we avoid name colition
+    """
     for entry_point in importlib.metadata.entry_points():
         if entry_point.group == "mcp_ckan":
             log.info(f"[{entry_point.module}] - python tools.")
             register_tools = entry_point.load()
-            register_tools(registry)
+            plugin_registry = registry.for_plugin(entry_point.module)
+            register_tools(plugin_registry)
 
 
 def load_yaml_plugins(registry):
@@ -33,13 +36,16 @@ def load_yaml_plugins(registry):
     packages (like Flask).
 
     https://packaging.python.org/en/latest/guides/creating-and-discovering-plugins/#using-naming-convention
+    Each plugin's YAMLs are loaded against a namespaced sub-registry,
+    so YAML-declared tool names get the same prefix as Python ones.
     """
     discovered_plugins = [name for _, name, _ in pkgutil.iter_modules() if name.startswith('mcp_ckan_')]
     for plugin in discovered_plugins:
         resources = importlib.resources.files(plugin)
+        plugin_registry = registry.for_plugin(plugin)
         for resource in resources.rglob('*.yaml'):
             log.info(f"[{plugin}] - {resource.name}")
-            load_dataset(registry, resource)
+            load_dataset(plugin_registry, resource)
 
 
 def create_mcp_server(host, port):
