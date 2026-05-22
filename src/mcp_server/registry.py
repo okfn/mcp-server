@@ -104,3 +104,73 @@ class ToolRegistry:
             log.info(f" - Registered: [{fn.__name__}]")
             return self._mcp.tool(meta=tool_meta)(fn)
         return decorator
+
+    def _resource_uri(self, uri: str) -> str:
+        """Normalize a plugin-supplied URI to ``mcp://<plugin>/<path>``.
+
+        Plugins pass a short path (``"ben/libro-2024.pdf"``); the registry
+        builds the full URI so namespacing is automatic and consistent across
+        plugins. A pre-built ``mcp://`` URI is accepted as-is for callers that
+        want explicit control.
+        """
+        if uri.startswith("mcp://") or "://" in uri:
+            return uri
+        if self._namespace is None:
+            return f"mcp://core/{uri.lstrip('/')}"
+        return f"mcp://{self._namespace}/{uri.lstrip('/')}"
+
+    def resource(
+        self,
+        uri: str,
+        *,
+        name: str | None = None,
+        description: str | None = None,
+        mime_type: str | None = None,
+        annotations: dict | None = None,
+    ):
+        """Decorator that registers a resource with FastMCP, namespaced by plugin.
+
+        Resources are static (or lazily computed) content addressed by URI:
+        documents, methodology PDFs, reference datasets, etc. Unlike tools,
+        the LLM does NOT autodiscover them - UI tools will be able list them.
+        Plugins declare resources from a top-level ``register_resources(registry)``
+        function.
+
+        The decorated function is the lazy loader: it returns ``str`` for
+        text content or ``bytes`` for binary (PDF, image, etc.). It runs
+        only when a client calls ``resources/read``.
+
+        Args:
+            uri: Short path under the plugin namespace, e.g. ``"ben/libro-2024.pdf"``.
+                Becomes ``mcp://<plugin>/ben/libro-2024.pdf`` on the wire.
+            name: Human-readable label shown in the gateway sidebar.
+            description: One/two sentences describing what the resource is.
+            mime_type: e.g. ``"application/pdf"``, ``"text/markdown"``, ``"text/csv"``.
+            annotations: Free-form metadata persisted in the resource's ``_meta``
+                so the gateway can render an "Open original" link, publisher
+                badge, etc. Conventional keys: ``source_url``, ``publisher``,
+                ``year``, ``language``.
+        """
+        def decorator(fn):
+            full_uri = self._resource_uri(uri)
+
+            if self._namespace and not fn.__name__.startswith(self._namespace + "_"):
+                fn.__name__ = f"{self._namespace}_{fn.__name__}"
+
+            res_meta: dict = {}
+            if self._namespace:
+                res_meta["plugin"] = self._namespace
+            if self._plugin_metadata:
+                res_meta["plugin_metadata"] = self._plugin_metadata
+            if annotations:
+                res_meta["annotations"] = annotations
+
+            log.info(f" - Registered resource: [{full_uri}]")
+            return self._mcp.resource(
+                uri=full_uri,
+                name=name,
+                description=description,
+                mime_type=mime_type,
+                meta=res_meta or None,
+            )(fn)
+        return decorator
