@@ -29,6 +29,26 @@ def load_python_plugins(registry):
             register_tools(plugin_registry)
 
 
+def load_python_resources(registry):
+    """Load Python resources defined in plugins.
+
+    Optional sibling of ``load_python_plugins``: if the plugin's top-level
+    module exposes a ``register_resources(registry)`` callable, the server
+    invokes it with the same namespaced sub-registry used for tools. Plugins
+    with no documents/PDFs to expose simply don't define the function.
+    """
+    for entry_point in importlib.metadata.entry_points():
+        if entry_point.group != "mcp_ckan":
+            continue
+        module = importlib.import_module(entry_point.module)
+        register_resources = getattr(module, "register_resources", None)
+        if not callable(register_resources):
+            continue
+        log.info(f"[{entry_point.module}] - python resources.")
+        plugin_registry = registry.for_plugin(entry_point.module)
+        register_resources(plugin_registry)
+
+
 def load_yaml_plugins(registry):
     """Load YAML tools defined in plugins.
 
@@ -53,6 +73,7 @@ def create_mcp_server(host, port):
     mcp = FastMCP("Demo", host=host, port=port, streamable_http_path="/")
     registry = ToolRegistry(mcp)
     load_python_plugins(registry)
+    load_python_resources(registry)
     load_yaml_plugins(registry)
     return mcp
 
