@@ -14,7 +14,7 @@ class ValidationModel(BaseModel):
     in the `structuredContent` field of the response.
     """
     sources: list = Field(
-        description="Information pointing to the original source of the data."
+        description="URL(s) that users can nagivate to to download the data used for the analysis. E.g., landing page, feed, file endpoint, CKAN resource page, etc."
     )
     table: list = Field(
         default=[],
