@@ -2,7 +2,7 @@
 MCP Server with dynamic tool loading
 
 This server automatically discovers and loads tools from installed python packages.
-Each package should have an `mcp_ckan` entrypoint with a register_tools(registry) function.
+Each package should have an `mcp_server` entrypoint with a register_tools(registry) function.
 """
 import importlib
 import logging
@@ -22,7 +22,7 @@ def load_python_plugins(registry):
     Each plugin defines a namespaced sub-registry so we avoid name colition
     """
     for entry_point in importlib.metadata.entry_points():
-        if entry_point.group == "mcp_ckan":
+        if entry_point.group == "mcp_server":
             log.info(f"[{entry_point.module}] - python tools.")
             register_tools = entry_point.load()
             plugin_registry = registry.for_plugin(entry_point.module)
@@ -38,7 +38,7 @@ def load_python_resources(registry):
     with no documents/PDFs to expose simply don't define the function.
     """
     for entry_point in importlib.metadata.entry_points():
-        if entry_point.group != "mcp_ckan":
+        if entry_point.group != "mcp_server":
             continue
         module = importlib.import_module(entry_point.module)
         register_resources = getattr(module, "register_resources", None)
@@ -59,7 +59,7 @@ def load_yaml_plugins(registry):
     Each plugin's YAMLs are loaded against a namespaced sub-registry,
     so YAML-declared tool names get the same prefix as Python ones.
     """
-    discovered_plugins = [name for _, name, _ in pkgutil.iter_modules() if name.startswith('mcp_ckan_')]
+    discovered_plugins = [name for _, name, _ in pkgutil.iter_modules() if name.startswith('mcp_server_')]
     for plugin in discovered_plugins:
         resources = importlib.resources.files(plugin)
         plugin_registry = registry.for_plugin(plugin)

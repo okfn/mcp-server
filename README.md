@@ -2,7 +2,8 @@
 
 **Note:** This project is currently in early research phase. Breaking changes are expected.
 
-MCP Server that allows admins to register custom tools, by installing python packages, to consistently and accurately answer user questions using data.
+An MCP server to build rich AI data applications with focus on traceability. This server allows admins to register custom tools, by installing
+python packages, to consistently and accurately answer user questions using data.
 
 ## Running locally
 
@@ -19,7 +20,7 @@ uv run pytest
 
 Run the server:
 ```bash
-uv run mcp-ckan
+uv run mcp-server
 ```
 
 ## Server Settings
@@ -39,7 +40,7 @@ Create the file `.vscode/mcp.json`:
 ```json
 {
   "servers": {
-    "mybcie-server": {
+    "my-server": {
       "url": "http://127.0.0.1:8063",
       "type": "http"
     }
@@ -53,39 +54,39 @@ Create the file `.vscode/mcp.json`:
 This tool allows you to test tools locally without any AI model.
 
 ```bash
-npx @modelcontextprotocol/inspector uv run mcp-ckan
+npx @modelcontextprotocol/inspector uv run mcp-server
 ```
 
 ## Fetching Remote Tools
 
 To register remote tools just install a Python package that can register MCP tools for your particular datasets.
-You can see an example at [https://github.com/okfn/mcp-ckan-examplepythontools](https://github.com/okfn/mcp-ckan-examplepythontools)
+You can see an example at [https://github.com/okfn/mcp-examplepythontools](https://github.com/okfn/mcp-examplepythontools)
 
 In a nutshell, you can extend by installing python plugins:
 
 ```bash
-uv pip install "git+https://github.com/okfn/mcp-ckan"
-uv pip install "git+https://github.com/okfn/mcp-ckan-examplepythontools"
-uv run mcp-ckan
+uv pip install "git+https://github.com/okfn/mcp-server"
+uv pip install "git+https://github.com/okfn/mcp-examplepythontools"
+uv run mcp-server
 ```
 
-The MCP server is configured to load the tools at startup time by iterating throug all the installed python packages looking for `mcp_ckan` entrypoints.
+The MCP server is configured to load the tools at startup time by iterating throug all the installed python packages looking for `mcp_server` entrypoints.
 
-# Tutorial: Developing a new MCP CKAN plugin
+# Tutorial: Developing a new MCP Server Plugin
 
 ## Creating a new plugin
 
 1. Create a new pip-installable package:
 
 ```bash
-uv init --package mcp-ckan-exampleplugin
-cd mcp-ckan-exampleplugin
+uv init --package mcp-exampleplugin
+cd mcp-exampleplugin
 ```
 
-2. Install the mcp-ckan dependency:
+2. Install the mcp-server dependency:
 
 ```bash
-uv add https://github.com/okfn/mcp-ckan.git
+uv add https://github.com/okfn/mcp-server.git
 ```
 
 3. Define a `register_tools(mcp)` function that register tools in a MCP Server registry:
@@ -110,16 +111,16 @@ def register_tools(registry):
         )
 ```
 
-4. Register a new `mcp_ckan` entrypoint in the `pyproject.toml` file that calls the newly created `register_tools` function.
+4. Register a new `mcp_server` entrypoint in the `pyproject.toml` file that calls the newly created `register_tools` function.
 
 ```toml
-[project.entry-points.mcp_ckan]
-mcp-ckan-examplepythontools = "mcp_ckan_examplepythontools:register_tools"
+[project.entry-points.mcp_server]
+mcp-examplepythontools = "mcp_examplepythontools:register_tools"
 ```
 
-5. Run the mcp-ckan server (inside the newly created package folder)
+5. Run the MCP server (inside the newly created package folder)
 ```
-MCP_TRANSPORT=http uv run mcp-ckan
+MCP_TRANSPORT=http uv run mcp-server
 ```
 
 6. Run MCP Inspector to test the tool
