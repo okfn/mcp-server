@@ -1,7 +1,7 @@
 [project]
 name = "mcp-server"
 version = "0.0.1"
-description = "Simple MCP server test with remote tools support."
+description = "An MCP server to build rich data applications with focus on traceability."
 readme = "README.md"
 requires-python = ">=3.14"
 dependencies = [
@@ -12,7 +12,7 @@ dependencies = [
 ]
 
 [project.scripts]
-mcp-ckan = "mcp_server.server:main"
+mcp-server = "mcp_server.server:main"
 
 [dependency-groups]
 dev = [
