@@ -20,21 +20,11 @@ class PluginsRegistry:
 
     def __init__(self, mcp: FastMCP):
         self._mcp = mcp
-        # ``{namespace: metadata}``. Each value is the SAME dict object the
-        # plugin's Plugin mutates via set_plugin_info(), so
-        # build_instructions() reads every plugin's final self-description from
-        # here without any extra plumbing.
         self._plugins: dict[str, dict] = {}
 
     def for_plugin(self, package_name: str) -> "Plugin":
         """Return a per-plugin :class:`Plugin` that namespaces everything
         it registers under ``package_name`` while sharing this FastMCP server.
-
-        for_plugin() is called once per registration pass (python tools, python
-        resources, yaml), so the SAME plugin can ask for a registry several
-        times. Reuse the metadata dict across calls: the Plugin gets the
-        same object, so set_plugin_info() mutations survive and later passes
-        don't clobber them with a fresh get_repo_metadata().
         """
         metadata = self._plugins.get(package_name)
         if metadata is None:
@@ -45,15 +35,6 @@ class PluginsRegistry:
     def build_instructions(self) -> str:
         """Compose the server's MCP ``instructions`` string from the metadata
         each plugin self-declares via ``Plugin.set_plugin_info``.
-
-        ``instructions`` is a standard field of the MCP ``initialize`` result:
-        a free-text hint the server hands clients describing how to use it.
-        The gateway injects it into the LLM system prompt. Because the string
-        is built from whatever plugins are installed, a deployment with only
-        one plugin yields instructions scoped to that single domain.
-
-        Spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
-        (see the ``instructions`` field of ``InitializeResult``).
         """
         blocks = []
         for namespace, meta in self._plugins.items():
@@ -93,20 +74,6 @@ class PluginsRegistry:
 class Plugin:
     """Per-plugin registry: namespaces one plugin's tools/resources and enforces
     the ToolOutput contract.
-
-    Obtained from :meth:`PluginsRegistry.for_plugin`; this is the object a plugin
-    receives in ``register_tools(registry)`` / ``register_resources(registry)``.
-
-    Intercepts every ``tool()`` call to verify that the function declares
-    ``-> DataToolOutput`` in its return annotation. Validation happens at
-    registration time (server startup). Tools that do not declare the correct
-    return annotation are **not registered** and a warning is logged instead, so
-    the server still starts and serves its valid tools.
-
-    Plugins and engines must use this registry instead of calling ``mcp.tool()``
-    directly. The ``tool()`` method returns the same decorator API so existing
-    patterns (``@registry.tool()`` and ``registry.tool()(fn)``) work unchanged;
-    every tool name is automatically prefixed with the plugin namespace.
     """
 
     def __init__(self, mcp: FastMCP, namespace: str, plugin_metadata: dict):
@@ -121,16 +88,6 @@ class Plugin:
         instructions: str | None = None,
     ) -> None:
         """Self-describe the plugin so MCP clients can render a richer catalog.
-
-        Plugins call this from ``register_tools()`` before declaring their tools.
-        The values are merged into ``_meta.plugin_metadata`` alongside the URLs
-        already read from ``[project.urls]`` — the server stays agnostic; only
-        the plugin knows what its description and sample questions are. The same
-        metadata is what :meth:`PluginsRegistry.build_instructions` composes into
-        the server's MCP ``instructions``.
-
-        Call this BEFORE any ``@registry.tool()`` decorators so every tool's
-        meta payload picks up the new fields.
         """
         if description is not None:
             self._plugin_metadata["description"] = description
