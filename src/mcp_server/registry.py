@@ -91,10 +91,16 @@ class Plugin:
         """
         if description is not None:
             self._plugin_metadata["description"] = description
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide a description")
         if sample_questions is not None:
             self._plugin_metadata["sample_questions"] = list(sample_questions)
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide sample questions")
         if instructions is not None:
             self._plugin_metadata["instructions"] = instructions
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide instructions")
 
     def tool(self):
         """Decorator that registers a function with FastMCP after validating its
