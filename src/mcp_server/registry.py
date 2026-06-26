@@ -16,9 +16,6 @@ class PluginsRegistry:
     per plugin to hand each a namespaced :class:`Plugin`. After every
     plugin has loaded, ``build_instructions()`` composes the server's MCP
     ``instructions`` field from each plugin's self-description.
-
-    This is the "app" in the Flask analogy; :class:`Plugin` is the
-    "blueprint" a plugin registers tools and resources on.
     """
 
     def __init__(self, mcp: FastMCP):
