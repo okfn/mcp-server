@@ -9,33 +9,33 @@ from mcp_server.repo import get_repo_metadata
 log = logging.getLogger(__name__)
 
 
-class PluginRegistry:
+class PluginsRegistry:
     """Root registry: owns the FastMCP server and the set of all plugins.
 
     ``server.py`` builds exactly one of these, then calls ``for_plugin()`` once
-    per plugin to hand each a namespaced :class:`ToolRegistry`. After every
+    per plugin to hand each a namespaced :class:`Plugin`. After every
     plugin has loaded, ``build_instructions()`` composes the server's MCP
     ``instructions`` field from each plugin's self-description.
 
-    This is the "app" in the Flask analogy; :class:`ToolRegistry` is the
+    This is the "app" in the Flask analogy; :class:`Plugin` is the
     "blueprint" a plugin registers tools and resources on.
     """
 
     def __init__(self, mcp: FastMCP):
         self._mcp = mcp
         # ``{namespace: metadata}``. Each value is the SAME dict object the
-        # plugin's ToolRegistry mutates via set_plugin_info(), so
+        # plugin's Plugin mutates via set_plugin_info(), so
         # build_instructions() reads every plugin's final self-description from
         # here without any extra plumbing.
         self._plugins: dict[str, dict] = {}
 
-    def for_plugin(self, package_name: str) -> "ToolRegistry":
-        """Return a per-plugin :class:`ToolRegistry` that namespaces everything
+    def for_plugin(self, package_name: str) -> "Plugin":
+        """Return a per-plugin :class:`Plugin` that namespaces everything
         it registers under ``package_name`` while sharing this FastMCP server.
 
         for_plugin() is called once per registration pass (python tools, python
         resources, yaml), so the SAME plugin can ask for a registry several
-        times. Reuse the metadata dict across calls: the ToolRegistry gets the
+        times. Reuse the metadata dict across calls: the Plugin gets the
         same object, so set_plugin_info() mutations survive and later passes
         don't clobber them with a fresh get_repo_metadata().
         """
@@ -43,11 +43,11 @@ class PluginRegistry:
         if metadata is None:
             metadata = get_repo_metadata(package_name) or {}
             self._plugins[package_name] = metadata
-        return ToolRegistry(self._mcp, namespace=package_name, plugin_metadata=metadata)
+        return Plugin(self._mcp, namespace=package_name, plugin_metadata=metadata)
 
     def build_instructions(self) -> str:
         """Compose the server's MCP ``instructions`` string from the metadata
-        each plugin self-declares via ``ToolRegistry.set_plugin_info``.
+        each plugin self-declares via ``Plugin.set_plugin_info``.
 
         ``instructions`` is a standard field of the MCP ``initialize`` result:
         a free-text hint the server hands clients describing how to use it.
@@ -93,11 +93,11 @@ class PluginRegistry:
         return preamble + "\n\n" + "\n\n".join(blocks)
 
 
-class ToolRegistry:
+class Plugin:
     """Per-plugin registry: namespaces one plugin's tools/resources and enforces
     the ToolOutput contract.
 
-    Obtained from :meth:`PluginRegistry.for_plugin`; this is the object a plugin
+    Obtained from :meth:`PluginsRegistry.for_plugin`; this is the object a plugin
     receives in ``register_tools(registry)`` / ``register_resources(registry)``.
 
     Intercepts every ``tool()`` call to verify that the function declares
@@ -129,7 +129,7 @@ class ToolRegistry:
         The values are merged into ``_meta.plugin_metadata`` alongside the URLs
         already read from ``[project.urls]`` — the server stays agnostic; only
         the plugin knows what its description and sample questions are. The same
-        metadata is what :meth:`PluginRegistry.build_instructions` composes into
+        metadata is what :meth:`PluginsRegistry.build_instructions` composes into
         the server's MCP ``instructions``.
 
         Call this BEFORE any ``@registry.tool()`` decorators so every tool's

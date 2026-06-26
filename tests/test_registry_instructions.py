@@ -1,30 +1,30 @@
 """
-Tests for PluginRegistry.build_instructions() - the composition of the MCP
+Tests for PluginsRegistry.build_instructions() - the composition of the MCP
 `instructions` field (initialize result) from each plugin's self-declared
-metadata (ToolRegistry.set_plugin_info).
+metadata (Plugin.set_plugin_info).
 
 Spec: https://modelcontextprotocol.io/specification/2025-11-25/basic/lifecycle
 """
 import pytest
 from mcp.server.fastmcp import FastMCP
 from mcp.shared.memory import create_connected_server_and_client_session
-from mcp_server.registry import PluginRegistry
+from mcp_server.registry import PluginsRegistry
 
 
 class TestBuildInstructions:
     def test_empty_when_no_plugins(self):
-        pr = PluginRegistry(FastMCP("test"))
+        pr = PluginsRegistry(FastMCP("test"))
         assert pr.build_instructions() == ""
 
     def test_skips_plugins_without_self_description(self):
         # A plugin that never calls set_plugin_info contributes nothing to the
         # prompt (repo urls alone are not persona/doctrine).
-        root = PluginRegistry(FastMCP("test"))
+        root = PluginsRegistry(FastMCP("test"))
         root.for_plugin("mcp_server_silent")
         assert root.build_instructions() == ""
 
     def test_composes_persona_description_and_questions(self):
-        root = PluginRegistry(FastMCP("test"))
+        root = PluginsRegistry(FastMCP("test"))
         sub = root.for_plugin("mcp_server_demo")
         sub.set_plugin_info(
             description="Demo datasets.",
@@ -42,7 +42,7 @@ class TestBuildInstructions:
         assert out.index("You only answer about demo data.") < out.index("Demo datasets.")
 
     def test_composes_multiple_plugins(self):
-        root = PluginRegistry(FastMCP("test"))
+        root = PluginsRegistry(FastMCP("test"))
         root.for_plugin("mcp_server_a").set_plugin_info(instructions="Scope A.")
         root.for_plugin("mcp_server_b").set_plugin_info(instructions="Scope B.")
 
@@ -58,7 +58,7 @@ class TestBuildInstructions:
         metadata dict, not clobber what set_plugin_info() populated on the first
         pass - otherwise build_instructions() comes back empty.
         """
-        root = PluginRegistry(FastMCP("test"))
+        root = PluginsRegistry(FastMCP("test"))
 
         # First pass: self-describe + (would) register tools.
         first = root.for_plugin("mcp_server_dual")
@@ -80,7 +80,7 @@ async def test_instructions_travel_in_initialize_result():
     """End-to-end: what build_instructions() produces is what an MCP client
     receives in the `instructions` field of the initialize handshake."""
     mcp = FastMCP("test")
-    root = PluginRegistry(mcp)
+    root = PluginsRegistry(mcp)
     root.for_plugin("mcp_server_demo").set_plugin_info(instructions="Only demo data.")
     mcp._mcp_server.instructions = root.build_instructions()
 

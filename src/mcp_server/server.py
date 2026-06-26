@@ -11,7 +11,7 @@ import pkgutil
 from mcp.server.fastmcp import FastMCP
 
 from mcp_server.engines import load_dataset
-from mcp_server.registry import PluginRegistry
+from mcp_server.registry import PluginsRegistry
 from mcp_server.settings import MCP_TRANSPORT, MCP_HOST, MCP_PORT
 
 log = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ def load_yaml_plugins(registry):
 def create_mcp_server(host, port):
     """Create MCP server with settings from environment variables"""
     mcp = FastMCP("Demo", host=host, port=port, streamable_http_path="/")
-    registry = PluginRegistry(mcp)
+    registry = PluginsRegistry(mcp)
     load_python_plugins(registry)
     load_python_resources(registry)
     load_yaml_plugins(registry)
