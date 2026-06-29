@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 class ValidationModel(BaseModel):
     """Schema for all Structured Outputs of the MCP server.
 
-    Every tool registered through the ToolRegistry must declare ``-> DataToolOutput``
+    Every tool registered through a plugin's Plugin registry must declare ``-> DataToolOutput``
     in its return annotation.  The registry checks this at startup; tools that
     don't comply are skipped with a warning.
 

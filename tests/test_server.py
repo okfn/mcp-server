@@ -15,11 +15,6 @@ from mcp_server.server import mcp
 
 
 @pytest.fixture
-def anyio_backend():
-    return "asyncio"
-
-
-@pytest.fixture
 async def client_session() -> AsyncGenerator[ClientSession]:
     async with create_connected_server_and_client_session(mcp, raise_exceptions=True) as _session:
         yield _session

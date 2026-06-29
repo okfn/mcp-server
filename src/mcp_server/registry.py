@@ -9,59 +9,98 @@ from mcp_server.repo import get_repo_metadata
 log = logging.getLogger(__name__)
 
 
-class ToolRegistry:
-    """Controls tool registration and enforces the ToolOutput contract.
+class PluginsRegistry:
+    """Root registry: owns the FastMCP server and the set of all plugins.
 
-    Wraps a FastMCP instance and intercepts every ``tool()`` call to verify that
-    the function declares ``-> DataToolOutput`` in its return annotation.  Validation
-    happens at registration time (server startup).
-
-    Tools that do not declare the correct return annotation are **not registered**
-    and a warning is logged instead.  This allows the server to start and serve
-    only its valid tools.
-
-    Plugins and engines must use this registry instead of calling ``mcp.tool()``
-    directly.  The ``tool()`` method returns the same decorator API so existing
-    patterns (``@registry.tool()`` and ``registry.tool()(fn)``) work unchanged.
-    Use ``for_plugin()`` so every tool that plugin registers is automatically namespaced.
+    ``server.py`` builds exactly one of these, then calls ``for_plugin()`` once
+    per plugin to hand each a namespaced :class:`Plugin`. After every
+    plugin has loaded, ``build_instructions()`` composes the server's MCP
+    ``instructions`` field from each plugin's self-description.
     """
 
-    def __init__(self, mcp: FastMCP, namespace: str | None = None, plugin_metadata: dict | None = None):
+    def __init__(self, mcp: FastMCP):
+        self._mcp = mcp
+        self._plugins: dict[str, dict] = {}
+
+    def for_plugin(self, package_name: str) -> "Plugin":
+        """Return a per-plugin :class:`Plugin` that namespaces everything
+        it registers under ``package_name`` while sharing this FastMCP server.
+        """
+        metadata = self._plugins.get(package_name)
+        if metadata is None:
+            metadata = get_repo_metadata(package_name) or {}
+            self._plugins[package_name] = metadata
+        return Plugin(self._mcp, namespace=package_name, plugin_metadata=metadata)
+
+    def build_instructions(self) -> str:
+        """Compose the server's MCP ``instructions`` string from the metadata
+        each plugin self-declares via ``Plugin.set_plugin_info``.
+        """
+        blocks = []
+        for namespace, meta in self._plugins.items():
+            if not meta:
+                continue
+            lines = []
+            # The plugin's own persona/doctrine, injected verbatim and first so
+            # it frames everything below (scope, units caveats, off-topic rule).
+            instructions = meta.get("instructions")
+            if instructions:
+                lines.append(instructions.strip())
+            description = meta.get("description")
+            if description:
+                lines.append(description.strip())
+            questions = meta.get("sample_questions") or []
+            if questions:
+                lines.append("Example questions it can answer:")
+                lines.extend(f"- {q}" for q in questions)
+            if lines:
+                blocks.append("\n".join(lines))
+
+        if not blocks:
+            return ""
+
+        # Tool names are namespaced per plugin, so the fallback tool surfaces as
+        # ``<plugin>_no_tool_disponible``. Reference it by suffix, not exact name.
+        preamble = (
+            "You are a data assistant. Answer every question using at least "
+            "one of the available tools; never answer factual questions from "
+            "your own knowledge. If no tool fits, call the fallback tool whose "
+            "name ends in `no_tool_disponible` with a short reason. The "
+            "available tools cover these domains:"
+        )
+        return preamble + "\n\n" + "\n\n".join(blocks)
+
+
+class Plugin:
+    """Per-plugin registry: namespaces one plugin's tools/resources and enforces
+    the ToolOutput contract.
+    """
+
+    def __init__(self, mcp: FastMCP, namespace: str, plugin_metadata: dict):
         self._mcp = mcp
         self._namespace = namespace
         self._plugin_metadata = plugin_metadata
 
-    def for_plugin(self, package_name: str) -> "ToolRegistry":
-        """Return a sub-registry that namespaces tools under the plugin package.
-
-        The returned registry shares the same FastMCP instance, so all tools
-        end up on the same server, but their names are prefixed with the
-        namespace derived from ``package_name``.
-        Allow using metadata from the remote repo
-        """
-        return ToolRegistry(
-            self._mcp,
-            namespace=package_name,
-            plugin_metadata=get_repo_metadata(package_name),
-        )
-
-    def set_plugin_info(self, description: str | None = None, sample_questions: list[str] | None = None) -> None:
+    def set_plugin_info(
+        self,
+        description: str | None = None,
+        sample_questions: list[str] | None = None,
+        instructions: str | None = None,
+    ) -> None:
         """Self-describe the plugin so MCP clients can render a richer catalog.
-
-        Plugins call this from ``register_tools()`` before declaring their tools.
-        The values are merged into ``_meta.plugin_metadata`` alongside the URLs
-        already read from ``[project.urls]`` — the server stays agnostic; only
-        the plugin knows what its description and sample questions are.
-
-        Call this BEFORE any ``@registry.tool()`` decorators so every tool's
-        meta payload picks up the new fields.
         """
-        if self._plugin_metadata is None:
-            self._plugin_metadata = {}
         if description is not None:
             self._plugin_metadata["description"] = description
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide a description")
         if sample_questions is not None:
             self._plugin_metadata["sample_questions"] = list(sample_questions)
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide sample questions")
+        if instructions is not None:
+            self._plugin_metadata["instructions"] = instructions
+        else:
+            log.warning(f"Plugin {self._namespace} did not provide instructions")
 
     def tool(self):
         """Decorator that registers a function with FastMCP after validating its
@@ -70,9 +109,8 @@ class ToolRegistry:
         If the return annotation is not ``ToolOutput``, logs a warning and returns
         the original function **without** registering it with FastMCP.
 
-        When this registry was obtained via ``for_plugin``, the
-        function's ``__name__`` is prefixed with the plugin namespace before
-        being handed to FastMCP, so we avoind name collisions.
+        The function's ``__name__`` is prefixed with the plugin namespace before
+        being handed to FastMCP, so we avoid name collisions.
         """
         def decorator(fn):
             sig = inspect.signature(fn)
